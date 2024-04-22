@@ -69,6 +69,46 @@ PARTITION_STRATEGY = {
     "HOUR": TimePartitioningType.HOUR,
 }
 
+EXTENDED_ARRAY_SCHEMA_TYPES =  {
+    "sdc_recursive_integer_array": {
+        "type": ["null", "integer", "array"],
+        "items": {
+            "$ref": "#/definitions/sdc_recursive_integer_array"
+        }
+    },
+    "sdc_recursive_number_array": {
+        "type": ["null", "number", "array"],
+        "items": {
+            "$ref": "#/definitions/sdc_recursive_number_array"
+        }
+    },
+    "sdc_recursive_string_array": {
+        "type": ["null", "string", "array"],
+        "items": {
+            "$ref": "#/definitions/sdc_recursive_string_array"
+        }
+    },
+    "sdc_recursive_boolean_array": {
+        "type": ["null", "boolean", "array"],
+        "items": {
+            "$ref": "#/definitions/sdc_recursive_boolean_array"
+        }
+    },
+    "sdc_recursive_timestamp_array": {
+        "type": ["null", "string", "array"],
+        "format": "date-time",
+        "items": {
+            "$ref": "#/definitions/sdc_recursive_timestamp_array"
+        }
+    },
+    "sdc_recursive_object_array": {
+        "type": ["null", "object", "array"],
+        "items": {
+            "$ref": "#/definitions/sdc_recursive_object_array"
+        }
+    }
+}
+
 
 class SchemaResolverVersion(Enum):
     """The schema resolver version to use."""
@@ -749,6 +789,10 @@ class SchemaTranslator:
                 if "items" not in schema_property:
                     return SchemaField(name, "JSON", "REPEATED")
                 items_schema: dict = schema_property["items"]
+                if "type" not in items_schema and "$ref" in items_schema:
+                    ref = items_schema["$ref"].split("/")[-1]
+                    if ref in EXTENDED_ARRAY_SCHEMA_TYPES:
+                        items_schema = EXTENDED_ARRAY_SCHEMA_TYPES[ref] 
                 items_type = bigquery_type(items_schema["type"], items_schema.get("format", None))
                 if items_type == "record":
                     return self._translate_record_to_bigquery_schema(name, items_schema, "REPEATED")
@@ -773,6 +817,12 @@ class SchemaTranslator:
                     property_format = schema_property.get("format", None)
 
                 if "array" in property_type:
+                    if "items" in schema_property and "type" not in schema_property["items"]:
+                        items_schema: dict = schema_property["items"]
+                        if "$ref" in items_schema:
+                            ref = items_schema["$ref"].split("/")[-1]
+                            if ref in EXTENDED_ARRAY_SCHEMA_TYPES:
+                                schema_property["items"] = EXTENDED_ARRAY_SCHEMA_TYPES[ref] 
                     if "items" not in schema_property or "type" not in schema_property["items"]:
                         return SchemaField(name, "JSON", "REPEATED")
                     items_schema: dict = schema_property["items"]
